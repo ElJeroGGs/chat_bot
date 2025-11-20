@@ -216,7 +216,7 @@ INSTRUCCIONES ESTRICTAS:
                         'content': user_content
                     }
                 ],
-                temperature=0.1,
+                temperature=0.0,
                 max_tokens=1000,
                 stream=True
             )
@@ -354,30 +354,21 @@ def main():
     if 'quiz_puntuacion' not in st.session_state:
         st.session_state.quiz_puntuacion = 0
     
+    # ==================== AUTO-PROCESAR DOCUMENTOS ====================
+    # Procesar automáticamente la primera vez o si hay cambios
+    if not st.session_state.docs_processed or st.session_state.rag.documents_changed():
+        with st.spinner("⏳ Cargando base de datos..."):
+            count = st.session_state.rag.process_documents()
+            if count > 0:
+                st.session_state.docs_processed = True
+    
     # ==================== SIDEBAR ====================
     with st.sidebar:
         st.header("📋 Menú de Navegación")
         
-        # Verificar si documentos han cambiado
-        docs_changed = st.session_state.rag.documents_changed()
-        
-        # Botón para procesar documentos
-        if not st.session_state.docs_processed or docs_changed:
-            if docs_changed and st.session_state.docs_processed:
-                st.warning("⚠️ Se detectaron cambios en los documentos")
-            elif not st.session_state.docs_processed:
-                st.info("⚠️ Primero debes procesar los documentos")
-            
-            if st.button("🔄 Procesar Documentos", type="primary"):
-                with st.spinner("Procesando documentos..."):
-                    count = st.session_state.rag.process_documents()
-                    if count > 0:
-                        st.session_state.docs_processed = True
-                        st.success(f"✓ {count} fragmentos procesados")
-                        st.rerun()
-        
-        if st.session_state.docs_processed and not docs_changed:
-            st.success("✓ Base de datos actualizada")
+        # Mostrar estado de la base de datos
+        if st.session_state.docs_processed:
+            st.success("✓ Base de datos lista")
         
         st.divider()
         
