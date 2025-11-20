@@ -37,9 +37,6 @@ class RAGSystem:
         self.client = get_chroma_client()
         self.groq_client = get_groq_client()
         self.collection_name = "documentos_curso"
-        self.chunk_size = 1000
-        self.chunk_overlap = 200
-        self.doc_hash_file = ".doc_hash"
     
     def get_documents_hash(self, folder_path="./documentos"):
         """Genera un hash de los documentos actuales"""
@@ -345,7 +342,7 @@ def main():
     
     # Inicializar estado de procesamiento
     if 'docs_processed' not in st.session_state:
-        st.session_state.docs_processed = False
+        st.session_state.docs_processed = True  # Ya vienen precargados
     
     # Inicializar flag para generar respuesta
     if 'generate_response_flag' not in st.session_state:
@@ -364,19 +361,10 @@ def main():
     if 'quiz_puntuacion' not in st.session_state:
         st.session_state.quiz_puntuacion = 0
     
-    # ==================== AUTO-PROCESAR DOCUMENTOS (Una sola vez) ====================
-    # Procesar automáticamente la primera vez o si hay cambios (en background, sin spinner)
-    if not st.session_state.docs_processed or st.session_state.rag.documents_changed():
-        count = st.session_state.rag.process_documents()
-        if count > 0:
-            st.session_state.docs_processed = True
-    
     # ==================== SIDEBAR ====================
     with st.sidebar:
         st.header("📋 Menú de Navegación")
-        
-        # Mostrar estado de la base de datos (siempre listo)
-        st.success("✓ Sistema listo")
+        st.success("✓ Sistema listo - Embeddings precargados")
         
         st.divider()
         
