@@ -257,7 +257,7 @@ Ejemplo: "tratado, maastricht" o "brexit, consecuencias" o "mercosur"
         context = "\n\n".join(context_docs)
         
         system_instruction = """Eres EcoBot, un asistente académico experto en la Integración Regional de Europa y América.
-Tu objetivo es ayudar a estudiantes basándote EXCLUSIVAMENTE en el contexto proporcionado.
+Tu objetivo es ayudar a estudiantes basándote EXCLUSIVAMENTE en el material del curso.
 
 INSTRUCCIONES ESTRICTAS:
 1. Usa SOLO la información del apartado [CONTEXTO] para responder.
@@ -287,8 +287,8 @@ INSTRUCCIONES ESTRICTAS:
                         'content': user_content
                     }
                 ],
-                temperature=0.1,
-                max_tokens=2000,
+                temperature=0.0,
+                max_tokens=1500,
                 stream=True
             )
             
