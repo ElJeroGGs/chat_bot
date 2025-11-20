@@ -100,7 +100,7 @@ __pycache__/
 ### Presupuesto Groq
 
 - **Plan gratuito:** 30 requests/minuto (suficiente para demostración)
-- **Modelos disponibles:** mixtral-8x7b-32768 (gratuito)
+- **Modelo usado:** llama-3.1-70b-versatile (gratuito, más potente)
 - Ideal para prototipos y proyectos pequeños
 
 ### Troubleshooting
