@@ -1,0 +1,24 @@
+╔════════════════════════════════════════════════════════════════════════════╗
+║                     EXTRACCIÓN OCR DE IMÁGENES DEL CURSO                   ║
+║                                                                            ║
+║  Tema: TRATADO                                                  ║
+║  Documentos: 1                                                      ║
+║  Caracteres: 993  ║
+║  Fecha: 2025-11-19 22:51:37                                  ║
+╚════════════════════════════════════════════════════════════════════════════╝
+
+📄 Fuente: tratado_1.txt
+----------------------------------------
+# TRATADO CONSTITUTIVO DE LA COMUNIDAD EUROPEA DE LA ENERGÍA ATÓMICA (CEEA O EURATOM)
+
+**Objetivos:**
+- Tal como se deduce claramente del tenor del Título II, el objetivo del Tratado Euratom es fomentar el progreso en el campo de la energía nuclear.
+- En particular, el objetivo, dentro de un mercado común de la energía nuclear, es el siguiente:
+  - Fomentar la investigación,
+  - Lograr la seguridad de abastecimiento para todos los países de la Unión Europea (UE),
+  - Establecer un sistema para supervisar la utilización pacífica de materiales nucleares destinados a usos civiles y para garantizar unas normas comunes exigentes en materia de salud y seguridad.
+- El Tratado se limita estrictamente a los usos civiles (no militares) de la energía nuclear.
+- El Tratado Euratom ha proporcionado el marco para las ayudas de la UE.
+
+**Firmado en:** Roma (Italia) el 25 de marzo de 1957  
+**Entrada en vigor:** 1 de enero de 1958
