@@ -174,7 +174,7 @@ class RAGSystem:
         
         return len(documents)
     
-    def search(self, query, n_results=10):
+    def search(self, query, n_results=50):
         """Busca documentos relevantes"""
         collection = self.get_or_create_collection()
         
@@ -223,7 +223,7 @@ INSTRUCCIONES ESTRICTAS:
                         'content': user_content
                     }
                 ],
-                temperature=0.9,
+                temperature=0.0,
                 max_tokens=2000,
                 stream=True
             )
