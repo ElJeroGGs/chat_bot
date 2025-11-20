@@ -1,0 +1,16 @@
+.env
+.streamlit/secrets.toml
+chroma_db/
+.doc_hash
+temp_ocr/
+__pycache__/
+*.pyc
+.DS_Store
+.venv/
+venv/
+*.egg-info/
+dist/
+build/
+imagenes_curso/
+libros/
+documentos/

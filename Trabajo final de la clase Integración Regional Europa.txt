@@ -1,0 +1,74 @@
+Trabajo final de la clase Integración Regional Europa- América
+
+Instrucciones:
+ Se formarán equipos de 4 personas ( no más, no menos)
+Objetivo: Se hará el diseño de un chatbot funcional que permita consultar información clave del curso, deberá responder preguntas relacionadas al curso que se impartió este semestre se sintetizarán y organizarán los contenidos del curso, transformándolos en un chatbot interactivo que responda preguntas sobre los temas, subtemas, conceptos clave y ejemplos vistos durante el semestre.
+
+1. Plataforma sugerida
+Puedes usar:
+o Microsoft Power Virtual Agents
+o ManyChat
+o Chatfuel
+o Voiceflow
+o Google DialogFlow
+(o cualquier otra herramienta de bots sin programación avanzada).
+o 
+2. Función principal del chatbot
+El bot debe responder dudas relacionadas con el temario visto en el curso:
+* Conceptos clave
+* Definiciones
+* Clasificaciones
+* Ejemplos
+* Aplicaciones prácticas (si aplica)
+* Comparaciones entre temas
+* Preguntas frecuentes de examen
+
+
+3.Cobertura mínima de contenido
+* Debe incluir TODAS las unidades del programa.
+* Por cada unidad, al menos:
+o 8 conceptos clave
+o 1 ejemplo práctico
+o 2 preguntas frecuentes
+? Mínimo: 6 rutas por unidad.
+o 
+4. Estructura esperada
+* Mensaje de bienvenida
+* Menú por unidades o temas
+* Rutas conversacionales por subtemas
+* Ejemplos / casos
+* Sección de preguntas rápidas
+* Despedida / resumen
+* 
+5. Interacción
+* Debe tener menú por botones y permitir preguntas abiertas.
+* Mínimo 30 rutas conversacionales en total.
+6. Entrega
+* Enlace o QR del chatbot
+* Presentación breve 10 min demostrando uso
+* PDF de máximo 2 cuartillas con:
+a. Temas incluidos
+b. Mapa/concepto del flujo conversacional
+c. Justificación de diseño
+d. Nombre del bot
+e. Avatar o imagen
+f. Estilo de comunicación (formal/informal)
+g. Mensajes amigables
+h. Qué herramienta usaron
+i. Capturas de pantalla
+
+7. Sugerencias creativas (opcionales más décimos adicionales)
+* Incluir “mensajes sorpresa” (como motivación, tips de estudio, frase del día).
+* Agregar mini-quiz de control.
+* Incluir emojis o recursos visuales.
+* Modo nocturno: frases de apoyo cuando el usuario consulta tarde.
+
+
+
+
+
+
+8.Rúbrica de evaluación
+* Criterio* Qué se evalúa* %* Dominio de contenido académico* Correcta explicación de los temas del temario, claridad y exactitud conceptual* 35%* Organización y estructura* Cobertura de TODAS las unidades y coherencia en rutas conversacionales* 20%* Interacción y experiencia de usuario* Fluidez, navegación clara, botones/menús + preguntas abiertas* 20%* Creatividad y diseño* Nombre, avatar, tono de comunicación, mensajes amigables* 15%* Informe PDF* Flujo del bot + justificación de diseño* 10%
+* 9. Fecha de entrega: jueves 20 de noviembre
+
