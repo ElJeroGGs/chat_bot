@@ -175,14 +175,54 @@ class RAGSystem:
         return len(documents)
     
     def search(self, query, n_results=10):
-        """Busca documentos relevantes"""
+        """Busca documentos relevantes con sistema híbrido (semántico + keyword)"""
         collection = self.get_or_create_collection()
         
         try:
-            results = collection.query(
+            # 1. Búsqueda semántica (embeddings)
+            semantic_results = collection.query(
                 query_texts=[query],
-                n_results=n_results
+                n_results=n_results * 2  # Obtener más resultados para filtrar
             )
+            
+            # 2. Búsqueda por palabras clave (keyword matching)
+            # Extraer palabras importantes de la query (sin stopwords comunes)
+            stopwords = {'el', 'la', 'de', 'en', 'y', 'a', 'los', 'las', 'un', 'una', 'por', 'para', 'con', 'que', 'del', 'es', 'se', 'me', 'di', 'dí'}
+            keywords = [word.lower() for word in query.split() if word.lower() not in stopwords and len(word) > 2]
+            
+            # Filtrar y rankear resultados que contengan las keywords
+            filtered_docs = []
+            filtered_metadatas = []
+            filtered_ids = []
+            filtered_distances = []
+            
+            for idx, doc in enumerate(semantic_results['documents'][0]):
+                doc_lower = doc.lower()
+                # Contar cuántas keywords aparecen en el documento
+                keyword_matches = sum(1 for kw in keywords if kw in doc_lower)
+                
+                # Si tiene al menos una keyword o está en los primeros resultados semánticos, incluirlo
+                if keyword_matches > 0 or idx < n_results // 2:
+                    # Calcular score combinado (similitud semántica + keyword matching)
+                    semantic_score = 1 - semantic_results['distances'][0][idx]  # Convertir distancia a similitud
+                    keyword_score = keyword_matches / max(len(keywords), 1)
+                    combined_score = 0.6 * semantic_score + 0.4 * keyword_score
+                    
+                    filtered_docs.append(doc)
+                    filtered_metadatas.append(semantic_results['metadatas'][0][idx])
+                    filtered_ids.append(semantic_results['ids'][0][idx])
+                    filtered_distances.append(1 - combined_score)  # Convertir de vuelta a distancia
+            
+            # Ordenar por score combinado y tomar top n_results
+            sorted_indices = sorted(range(len(filtered_distances)), key=lambda i: filtered_distances[i])[:n_results]
+            
+            results = {
+                'documents': [[filtered_docs[i] for i in sorted_indices]],
+                'metadatas': [[filtered_metadatas[i] for i in sorted_indices]],
+                'ids': [[filtered_ids[i] for i in sorted_indices]],
+                'distances': [[filtered_distances[i] for i in sorted_indices]]
+            }
+            
             return results
         except Exception as e:
             st.error(f"Error en búsqueda: {e}")
@@ -278,16 +318,34 @@ def get_consejo_estudio():
 def generar_preguntas_quiz(rag_system):
     """Genera preguntas de quiz dinámicamente usando Groq"""
     import json
+    import random
     
     try:
-        # Buscar fragmentos relevantes sobre integración regional
-        resultados = rag_system.search("integración regional Europa América instituciones tratados", n_results=5)
+        # Usar diferentes queries aleatorias para obtener contextos variados
+        queries_posibles = [
+            "integración regional Europa instituciones Unión Europea",
+            "América Latina Mercosur TLCAN integración económica",
+            "tratados europeos Maastricht Roma Lisboa",
+            "teorías integración regional supranacional intergubernamental",
+            "Brexit consecuencias política europea comercio",
+            "zonas libre comercio uniones aduaneras mercado común"
+        ]
+        
+        query_seleccionada = random.choice(queries_posibles)
+        
+        # Buscar fragmentos relevantes con query aleatoria
+        resultados = rag_system.search(query_seleccionada, n_results=5)
         contexto = ""
         for doc in resultados['documents'][0]:
             contexto += doc + "\n\n"
         
-        # Prompt para generar preguntas
-        prompt = f"""Basándote en el siguiente contexto sobre Integración Regional en Europa y América, genera exactamente 5 preguntas de opción múltiple en formato JSON.
+        # Generar semilla aleatoria para mayor variabilidad
+        seed_variacion = random.randint(1, 1000)
+        
+        # Prompt para generar preguntas con instrucción de variabilidad
+        prompt = f"""Basándote en el siguiente contexto sobre Integración Regional en Europa y América, genera exactamente 5 preguntas de opción múltiple ÚNICAS Y DIFERENTES en formato JSON.
+
+IMPORTANTE: Genera preguntas VARIADAS y ORIGINALES. No repitas preguntas comunes. Usa este número como inspiración para variar: {seed_variacion}
 
 CONTEXTO:
 {contexto}
@@ -307,16 +365,17 @@ Genera el JSON exactamente en este formato (sin markdown):
 Asegúrate de:
 1. La respuesta correcta siempre es una de las opciones
 2. respuesta_correcta es el índice (0, 1, 2 o 3)
-3. Preguntas variadas y educativas
-4. Explicaciones claras y útiles"""
+3. Preguntas VARIADAS, CREATIVAS y educativas
+4. Explicaciones claras y útiles
+5. NO repetir las mismas preguntas típicas"""
 
-        # Llamar a Groq para generar preguntas
+        # Llamar a Groq para generar preguntas con mayor temperatura
         response = rag_system.groq_client.chat.completions.create(
             model="llama-3.3-70b-versatile",
             messages=[
                 {"role": "user", "content": prompt}
             ],
-            temperature=0.7,
+            temperature=1.2,
             max_tokens=2000
         )
         
