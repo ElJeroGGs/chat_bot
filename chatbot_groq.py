@@ -174,55 +174,15 @@ class RAGSystem:
         
         return len(documents)
     
-    def search(self, query, n_results=10):
-        """Busca documentos relevantes con sistema híbrido (semántico + keyword)"""
+    def search(self, query, n_results=15):
+        """Busca documentos relevantes"""
         collection = self.get_or_create_collection()
         
         try:
-            # 1. Búsqueda semántica (embeddings)
-            semantic_results = collection.query(
+            results = collection.query(
                 query_texts=[query],
-                n_results=n_results * 2  # Obtener más resultados para filtrar
+                n_results=n_results
             )
-            
-            # 2. Búsqueda por palabras clave (keyword matching)
-            # Extraer palabras importantes de la query (sin stopwords comunes)
-            stopwords = {'el', 'la', 'de', 'en', 'y', 'a', 'los', 'las', 'un', 'una', 'por', 'para', 'con', 'que', 'del', 'es', 'se', 'me', 'di', 'dí'}
-            keywords = [word.lower() for word in query.split() if word.lower() not in stopwords and len(word) > 2]
-            
-            # Filtrar y rankear resultados que contengan las keywords
-            filtered_docs = []
-            filtered_metadatas = []
-            filtered_ids = []
-            filtered_distances = []
-            
-            for idx, doc in enumerate(semantic_results['documents'][0]):
-                doc_lower = doc.lower()
-                # Contar cuántas keywords aparecen en el documento
-                keyword_matches = sum(1 for kw in keywords if kw in doc_lower)
-                
-                # Si tiene al menos una keyword o está en los primeros resultados semánticos, incluirlo
-                if keyword_matches > 0 or idx < n_results // 2:
-                    # Calcular score combinado (similitud semántica + keyword matching)
-                    semantic_score = 1 - semantic_results['distances'][0][idx]  # Convertir distancia a similitud
-                    keyword_score = keyword_matches / max(len(keywords), 1)
-                    combined_score = 0.6 * semantic_score + 0.4 * keyword_score
-                    
-                    filtered_docs.append(doc)
-                    filtered_metadatas.append(semantic_results['metadatas'][0][idx])
-                    filtered_ids.append(semantic_results['ids'][0][idx])
-                    filtered_distances.append(1 - combined_score)  # Convertir de vuelta a distancia
-            
-            # Ordenar por score combinado y tomar top n_results
-            sorted_indices = sorted(range(len(filtered_distances)), key=lambda i: filtered_distances[i])[:n_results]
-            
-            results = {
-                'documents': [[filtered_docs[i] for i in sorted_indices]],
-                'metadatas': [[filtered_metadatas[i] for i in sorted_indices]],
-                'ids': [[filtered_ids[i] for i in sorted_indices]],
-                'distances': [[filtered_distances[i] for i in sorted_indices]]
-            }
-            
             return results
         except Exception as e:
             st.error(f"Error en búsqueda: {e}")
