@@ -13,4 +13,13 @@ dist/
 build/
 imagenes_curso/
 libros/
-documentos/
+doc_convertidos/
+.vscode/
+.streamlit
+app.py
+trabajo final de la clase integración regional europea.txt
+DEPLOYMENT.md
+DOCUMENTACION_EUROBOT.md
+ocr_txt_mejorado.py
+ocr_txt.py
+pdfs_to_txt.py
