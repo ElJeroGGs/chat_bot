@@ -174,7 +174,7 @@ class RAGSystem:
         
         return len(documents)
     
-    def search(self, query, n_results=100):
+    def search(self, query, n_results=5):
         """Busca documentos relevantes con prioridad a palabras clave extraídas por LLM"""
         collection = self.get_or_create_collection()
         
