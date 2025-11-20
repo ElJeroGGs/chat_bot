@@ -223,8 +223,8 @@ INSTRUCCIONES ESTRICTAS:
                         'content': user_content
                     }
                 ],
-                temperature=0.1,
-                max_tokens=1000,
+                temperature=0.2,
+                max_tokens=2000,
                 stream=True
             )
             
