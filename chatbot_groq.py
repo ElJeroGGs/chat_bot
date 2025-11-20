@@ -14,22 +14,32 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+# ==================== CACHÉ GLOBAL DE CHROMADB ====================
+# Esto hace que los embeddings se carguen una sola vez en memoria
+@st.cache_resource
+def get_chroma_client():
+    """Carga ChromaDB una sola vez y lo mantiene en caché"""
+    return chromadb.PersistentClient(path="./chroma_db")
+
+@st.cache_resource
+def get_groq_client():
+    """Carga cliente Groq una sola vez"""
+    api_key = os.getenv("GROQ_API_KEY")
+    if not api_key:
+        st.error("❌ GROQ_API_KEY no está configurada. Configúrala en Streamlit Secrets o variables de entorno.")
+        st.stop()
+    return Groq(api_key=api_key)
+
 # ==================== CONFIGURACIÓN RAG CON GROQ ====================
 
 class RAGSystem:
     def __init__(self):
-        self.client = chromadb.PersistentClient(path="./chroma_db")
+        self.client = get_chroma_client()
+        self.groq_client = get_groq_client()
         self.collection_name = "documentos_curso"
         self.chunk_size = 1000
         self.chunk_overlap = 200
         self.doc_hash_file = ".doc_hash"
-        
-        # Inicializar cliente Groq
-        api_key = os.getenv("GROQ_API_KEY")
-        if not api_key:
-            st.error("❌ GROQ_API_KEY no está configurada. Configúrala en Streamlit Secrets o variables de entorno.")
-            st.stop()
-        self.groq_client = Groq(api_key=api_key)
     
     def get_documents_hash(self, folder_path="./documentos"):
         """Genera un hash de los documentos actuales"""
@@ -325,7 +335,7 @@ def mostrar_bienvenida():
 # ==================== MAIN APP ====================
 
 def main():
-    # Inicializar sistema RAG
+    # Inicializar sistema RAG (usa caché global)
     if 'rag' not in st.session_state:
         st.session_state.rag = RAGSystem()
     
@@ -354,21 +364,19 @@ def main():
     if 'quiz_puntuacion' not in st.session_state:
         st.session_state.quiz_puntuacion = 0
     
-    # ==================== AUTO-PROCESAR DOCUMENTOS ====================
-    # Procesar automáticamente la primera vez o si hay cambios
+    # ==================== AUTO-PROCESAR DOCUMENTOS (Una sola vez) ====================
+    # Procesar automáticamente la primera vez o si hay cambios (en background, sin spinner)
     if not st.session_state.docs_processed or st.session_state.rag.documents_changed():
-        with st.spinner("⏳ Cargando base de datos..."):
-            count = st.session_state.rag.process_documents()
-            if count > 0:
-                st.session_state.docs_processed = True
+        count = st.session_state.rag.process_documents()
+        if count > 0:
+            st.session_state.docs_processed = True
     
     # ==================== SIDEBAR ====================
     with st.sidebar:
         st.header("📋 Menú de Navegación")
         
-        # Mostrar estado de la base de datos
-        if st.session_state.docs_processed:
-            st.success("✓ Base de datos lista")
+        # Mostrar estado de la base de datos (siempre listo)
+        st.success("✓ Sistema listo")
         
         st.divider()
         
@@ -511,7 +519,6 @@ def main():
                     st.info(f"📖 {pregunta['explicacion']}")
                     
                     st.session_state.quiz_pregunta_actual += 1
-                    st.sleep(2)
                     st.rerun()
             
             with col3:
