@@ -174,15 +174,79 @@ class RAGSystem:
         
         return len(documents)
     
-    def search(self, query, n_results=50):
-        """Busca documentos relevantes"""
+    def search(self, query, n_results=10):
+        """Busca documentos relevantes con prioridad a palabras clave extraídas por LLM"""
         collection = self.get_or_create_collection()
         
         try:
-            results = collection.query(
+            # Extraer palabras clave usando el LLM
+            keyword_prompt = f"""Extrae SOLO las palabras clave más importantes de la siguiente pregunta. 
+Ignora palabras como: qué, es, el, la, de, en, etc.
+Enfócate en: nombres propios, términos técnicos, conceptos importantes.
+
+Pregunta: {query}
+
+Responde SOLO con las palabras clave separadas por comas, sin explicación adicional.
+Ejemplo: "tratado, maastricht" o "brexit, consecuencias" o "mercosur"
+"""
+            
+            try:
+                keyword_response = self.groq_client.chat.completions.create(
+                    model="llama-3.1-70b-versatile",
+                    messages=[{"role": "user", "content": keyword_prompt}],
+                    temperature=0.0,
+                    max_tokens=50
+                )
+                
+                keywords_text = keyword_response.choices[0].message.content.strip()
+                # Limpiar y convertir a lista
+                keywords = [kw.strip().lower() for kw in keywords_text.split(',') if kw.strip()]
+            except:
+                # Fallback: extracción simple si falla el LLM
+                stopwords = {'el', 'la', 'de', 'en', 'y', 'a', 'los', 'las', 'qué', 'es', 'un', 'una'}
+                keywords = [w.lower() for w in query.split() if w.lower() not in stopwords and len(w) > 2]
+            
+            # Obtener más resultados iniciales para filtrar
+            initial_results = collection.query(
                 query_texts=[query],
-                n_results=n_results
+                n_results=n_results * 5  # 5x más para tener margen
             )
+            
+            # Reordenar resultados priorizando keywords
+            scored_results = []
+            for idx, doc in enumerate(initial_results['documents'][0]):
+                doc_lower = doc.lower()
+                
+                # Contar coincidencias exactas de keywords
+                keyword_count = sum(1 for kw in keywords if kw in doc_lower)
+                
+                # Score combinado: similitud semántica (distancia) + bonus por keywords
+                semantic_distance = initial_results['distances'][0][idx]
+                keyword_bonus = keyword_count * 0.3  # Reducir distancia por cada keyword
+                
+                final_score = semantic_distance - keyword_bonus
+                
+                scored_results.append({
+                    'doc': doc,
+                    'metadata': initial_results['metadatas'][0][idx],
+                    'id': initial_results['ids'][0][idx],
+                    'distance': initial_results['distances'][0][idx],
+                    'keyword_count': keyword_count,
+                    'final_score': final_score
+                })
+            
+            # Ordenar por score final y tomar top n_results
+            scored_results.sort(key=lambda x: x['final_score'])
+            top_results = scored_results[:n_results]
+            
+            # Reconstruir formato de resultados
+            results = {
+                'documents': [[r['doc'] for r in top_results]],
+                'metadatas': [[r['metadata'] for r in top_results]],
+                'ids': [[r['id'] for r in top_results]],
+                'distances': [[r['distance'] for r in top_results]]
+            }
+            
             return results
         except Exception as e:
             st.error(f"Error en búsqueda: {e}")
@@ -223,7 +287,7 @@ INSTRUCCIONES ESTRICTAS:
                         'content': user_content
                     }
                 ],
-                temperature=0.9,
+                temperature=0.1,
                 max_tokens=2000,
                 stream=True
             )
