@@ -212,7 +212,7 @@ INSTRUCCIONES ESTRICTAS:
 
         try:
             response = self.groq_client.chat.completions.create(
-                model="llama-3.3-70b-versatile",
+                model="llama-3.1-8b-instant",
                 messages=[
                     {
                         'role': 'system',
@@ -223,9 +223,8 @@ INSTRUCCIONES ESTRICTAS:
                         'content': user_content
                     }
                 ],
-                temperature=0.1,  # Temperatura más baja para mayor precisión
-                max_tokens=1500,
-                top_p=0.9,  # Limitar diversidad de tokens
+                temperature=0.0,
+                max_tokens=2000,
                 stream=True
             )
             
@@ -332,7 +331,7 @@ Asegúrate de:
 
         # Llamar a Groq para generar preguntas con mayor temperatura
         response = rag_system.groq_client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
+            model="llama-3.1-8b-instant",
             messages=[
                 {"role": "user", "content": prompt}
             ],
