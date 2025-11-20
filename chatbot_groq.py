@@ -287,7 +287,7 @@ INSTRUCCIONES ESTRICTAS:
                         'content': user_content
                     }
                 ],
-                temperature=0.0,
+                temperature=0.2,
                 max_tokens=1500,
                 stream=True
             )
