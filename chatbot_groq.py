@@ -275,41 +275,72 @@ def get_consejo_estudio():
     ]
     return random.choice(consejos)
 
-def generar_preguntas_quiz():
-    """Genera preguntas de quiz"""
-    preguntas_quiz = [
-        {
-            "pregunta": "¿En qué año se firmó el Tratado de Roma que originó la CEE?",
-            "opciones": ["A) 1951", "B) 1957", "C) 1986", "D) 1992"],
-            "respuesta_correcta": 1,
-            "explicacion": "El Tratado de Roma de 1957 creó la Comunidad Económica Europea (CEE)."
-        },
-        {
-            "pregunta": "¿Cuál es el objetivo principal de la Unión Europea?",
-            "opciones": ["A) Control militar", "B) Unión política y económica", "C) Expansión territorial", "D) Competencia comercial"],
-            "respuesta_correcta": 1,
-            "explicacion": "La UE busca la unión política y económica de sus estados miembros."
-        },
-        {
-            "pregunta": "¿Cuántos estados miembros tiene actualmente la Unión Europea?",
-            "opciones": ["A) 15", "B) 20", "C) 27", "D) 32"],
-            "respuesta_correcta": 2,
-            "explicacion": "La UE tiene 27 estados miembros después de la salida del Reino Unido en 2020."
-        },
-        {
-            "pregunta": "¿Qué tratado creó la Unión Política Europea en 1992?",
-            "opciones": ["A) Tratado de Roma", "B) Acta Única Europea", "C) Tratado de Maastricht", "D) Tratado de Lisboa"],
-            "respuesta_correcta": 2,
-            "explicacion": "El Tratado de Maastricht de 1992 transformó la CEE en la UE."
-        },
-        {
-            "pregunta": "¿Cuál es la principal diferencia entre TLCAN y Mercosur?",
-            "opciones": ["A) Ubicación geográfica", "B) Nivel de institucionalización", "C) Número de miembros", "D) Objetivos económicos"],
-            "respuesta_correcta": 1,
-            "explicacion": "La UE tiene mayor institucionalización. Mercosur está entre ambos niveles."
-        }
+def generar_preguntas_quiz(rag_system):
+    """Genera preguntas de quiz dinámicamente usando Groq"""
+    import json
+    
+    try:
+        # Buscar fragmentos relevantes sobre integración regional
+        resultados = rag_system.search("integración regional Europa América instituciones tratados", n_results=5)
+        contexto = ""
+        for doc in resultados['documents'][0]:
+            contexto += doc + "\n\n"
+        
+        # Prompt para generar preguntas
+        prompt = f"""Basándote en el siguiente contexto sobre Integración Regional en Europa y América, genera exactamente 5 preguntas de opción múltiple en formato JSON.
+
+CONTEXTO:
+{contexto}
+
+Genera el JSON exactamente en este formato (sin markdown):
+{{
+    "preguntas": [
+        {{
+            "pregunta": "¿Pregunta sobre el tema?",
+            "opciones": ["A) Opción 1", "B) Opción 2", "C) Opción 3", "D) Opción 4"],
+            "respuesta_correcta": 0,
+            "explicacion": "Breve explicación de por qué es correcta"
+        }}
     ]
-    return preguntas_quiz
+}}
+
+Asegúrate de:
+1. La respuesta correcta siempre es una de las opciones
+2. respuesta_correcta es el índice (0, 1, 2 o 3)
+3. Preguntas variadas y educativas
+4. Explicaciones claras y útiles"""
+
+        # Llamar a Groq para generar preguntas
+        response = rag_system.groq_client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=[
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.7,
+            max_tokens=2000
+        )
+        
+        # Extraer respuesta
+        respuesta_text = response.choices[0].message.content
+        
+        # Limpiar respuesta si tiene markdown
+        respuesta_text = respuesta_text.replace("```json", "").replace("```", "").strip()
+        
+        # Parsear JSON
+        data = json.loads(respuesta_text)
+        return data['preguntas']
+        
+    except Exception as e:
+        st.error(f"Error generando preguntas: {e}")
+        # Fallback a preguntas por defecto
+        return [
+            {
+                "pregunta": "¿En qué año se firmó el Tratado de Roma?",
+                "opciones": ["A) 1951", "B) 1957", "C) 1986", "D) 1992"],
+                "respuesta_correcta": 1,
+                "explicacion": "El Tratado de Roma de 1957 creó la CEE."
+            }
+        ]
 
 def mostrar_bienvenida():
     """Muestra mensaje de bienvenida"""
@@ -360,6 +391,15 @@ def main():
     
     if 'quiz_puntuacion' not in st.session_state:
         st.session_state.quiz_puntuacion = 0
+    
+    if 'quiz_respondida' not in st.session_state:
+        st.session_state.quiz_respondida = False
+    
+    if 'quiz_respuesta_correcta' not in st.session_state:
+        st.session_state.quiz_respuesta_correcta = False
+    
+    if 'quiz_explicacion' not in st.session_state:
+        st.session_state.quiz_explicacion = ""
     
     # ==================== SIDEBAR ====================
     with st.sidebar:
@@ -445,10 +485,11 @@ def main():
         st.subheader("🎯 Herramientas de Estudio")
         
         if st.button("📝 Mini Quiz (5 preguntas)", use_container_width=True, type="secondary"):
-            st.session_state.quiz_activo = True
-            st.session_state.quiz_preguntas = generar_preguntas_quiz()
-            st.session_state.quiz_pregunta_actual = 0
-            st.session_state.quiz_puntuacion = 0
+            with st.spinner("🤔 Generando preguntas personalizadas..."):
+                st.session_state.quiz_activo = True
+                st.session_state.quiz_preguntas = generar_preguntas_quiz(st.session_state.rag)
+                st.session_state.quiz_pregunta_actual = 0
+                st.session_state.quiz_puntuacion = 0
             st.rerun()
         
         st.divider()
@@ -489,29 +530,60 @@ def main():
             respuesta_seleccionada = st.radio(
                 "Selecciona tu respuesta:",
                 pregunta['opciones'],
-                key=f"quiz_pregunta_{st.session_state.quiz_pregunta_actual}"
+                key=f"quiz_pregunta_{st.session_state.quiz_pregunta_actual}",
+                disabled=st.session_state.quiz_respondida  # Deshabilitar si ya respondió
             )
             
             idx_respuesta = pregunta['opciones'].index(respuesta_seleccionada)
             
             col1, col2, col3 = st.columns(3)
             
-            with col1:
-                if st.button("✓ Confirmar", use_container_width=True, type="primary"):
-                    if idx_respuesta == pregunta['respuesta_correcta']:
-                        st.success("✅ ¡Correcto!")
-                        st.session_state.quiz_puntuacion += 1
+            # Si no ha respondido, mostrar botón "Confirmar"
+            if not st.session_state.quiz_respondida:
+                with col1:
+                    if st.button("✓ Confirmar Respuesta", use_container_width=True, type="primary"):
+                        # Guardar la respuesta y evaluar
+                        st.session_state.quiz_respuesta_correcta = (idx_respuesta == pregunta['respuesta_correcta'])
+                        st.session_state.quiz_explicacion = pregunta['explicacion']
+                        
+                        if st.session_state.quiz_respuesta_correcta:
+                            st.session_state.quiz_puntuacion += 1
+                        
+                        st.session_state.quiz_respondida = True
+                        st.rerun()
+            
+            # Si ya respondió, mostrar retroalimentación y botón "Siguiente"
+            else:
+                st.divider()
+                
+                if st.session_state.quiz_respuesta_correcta:
+                    st.success("✅ ¡Correcto!")
+                else:
+                    st.error("❌ Incorrecto")
+                
+                st.info(f"📖 {st.session_state.quiz_explicacion}")
+                
+                st.divider()
+                
+                with col1:
+                    # Verificar si es la última pregunta
+                    es_ultima = st.session_state.quiz_pregunta_actual >= len(st.session_state.quiz_preguntas) - 1
+                    
+                    if es_ultima:
+                        if st.button("🏁 Terminar Quiz", use_container_width=True, type="primary"):
+                            st.session_state.quiz_activo = False
+                            st.session_state.quiz_respondida = False
+                            st.rerun()
                     else:
-                        st.error("❌ Incorrecto")
-                    
-                    st.info(f"📖 {pregunta['explicacion']}")
-                    
-                    st.session_state.quiz_pregunta_actual += 1
-                    st.rerun()
+                        if st.button("➡️ Siguiente Pregunta", use_container_width=True, type="primary"):
+                            st.session_state.quiz_pregunta_actual += 1
+                            st.session_state.quiz_respondida = False
+                            st.rerun()
             
             with col3:
-                if st.button("Terminar Quiz", use_container_width=True):
+                if st.button("Salir del Quiz", use_container_width=True):
                     st.session_state.quiz_activo = False
+                    st.session_state.quiz_respondida = False
                     st.rerun()
         
         else:
@@ -533,6 +605,9 @@ def main():
             
             if st.button("Volver al Chat", use_container_width=True, type="primary"):
                 st.session_state.quiz_activo = False
+                st.session_state.quiz_respondida = False
+                st.session_state.quiz_pregunta_actual = 0
+                st.session_state.quiz_puntuacion = 0
                 st.rerun()
         
         return
