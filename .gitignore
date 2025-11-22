@@ -1,6 +1,5 @@
 .env
 .streamlit/secrets.toml
-chroma_db/
 .doc_hash
 temp_ocr/
 __pycache__/
