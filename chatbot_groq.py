@@ -28,7 +28,13 @@ def get_groq_client():
     if not api_key:
         st.error("❌ GROQ_API_KEY no está configurada. Configúrala en Streamlit Secrets o variables de entorno.")
         st.stop()
-    return Groq(api_key=api_key)
+    
+    try:
+        return Groq(api_key=api_key)
+    except Exception as e:
+        st.error(f"❌ Error al inicializar cliente Groq: {str(e)}")
+        st.warning("Verifica que tu API key sea válida.")
+        st.stop()
 
 # ==================== CONFIGURACIÓN RAG CON GROQ ====================
 
@@ -201,8 +207,9 @@ Ejemplo: "tratado, maastricht" o "brexit, consecuencias" o "mercosur"
                 keywords_text = keyword_response.choices[0].message.content.strip()
                 # Limpiar y convertir a lista
                 keywords = [kw.strip().lower() for kw in keywords_text.split(',') if kw.strip()]
-            except:
+            except Exception as keyword_error:
                 # Fallback: extracción simple si falla el LLM
+                print(f"⚠️ Advertencia: No se pudo extraer keywords con LLM ({str(keyword_error)}). Usando extracción simple.")
                 stopwords = {'el', 'la', 'de', 'en', 'y', 'a', 'los', 'las', 'qué', 'es', 'un', 'una'}
                 keywords = [w.lower() for w in query.split() if w.lower() not in stopwords and len(w) > 2]
             
@@ -249,7 +256,9 @@ Ejemplo: "tratado, maastricht" o "brexit, consecuencias" o "mercosur"
             
             return results
         except Exception as e:
-            st.error(f"Error en búsqueda: {e}")
+            st.error(f"❌ Error en búsqueda de documentos: {str(e)}")
+            import traceback
+            print(f"Error detallado en search(): {traceback.format_exc()}")
             return None
     
     def generate_response(self, query, context_docs):
@@ -294,7 +303,19 @@ INSTRUCCIONES ESTRICTAS:
             
             return response
         except Exception as e:
-            st.error(f"Error al generar respuesta: {e}")
+            st.error(f"❌ Error al generar respuesta con Groq: {str(e)}")
+            import traceback
+            print(f"Error detallado en generate_response(): {traceback.format_exc()}")
+            
+            # Mostrar información específica sobre el error
+            error_str = str(e).lower()
+            if "rate" in error_str or "limit" in error_str:
+                st.warning("⏱️ Has excedido el límite de peticiones. Espera unos segundos e intenta de nuevo.")
+            elif "api" in error_str or "key" in error_str or "auth" in error_str:
+                st.warning("🔑 Verifica que tu GROQ_API_KEY sea válida.")
+            elif "timeout" in error_str:
+                st.warning("⏰ La petición tardó demasiado. Intenta de nuevo.")
+            
             return None
 
 # ==================== FUNCIONES DE UTILIDAD ====================
@@ -740,9 +761,14 @@ def main():
                                 "content": full_response
                             })
                         else:
-                            st.error("No se encontró información relevante.")
+                            st.error("⚠️ No se encontró información relevante en la base de datos.")
+                            st.info("💡 Intenta reformular tu pregunta o usa términos más específicos.")
                     except Exception as e:
-                        st.error(f"Error: {e}")
+                        st.error(f"❌ Error al procesar la solicitud: {str(e)}")
+                        st.warning("Posibles causas: problema con la API de Groq, límite de tasa excedido, o API key inválida.")
+                        import traceback
+                        with st.expander("🔍 Ver detalles técnicos del error"):
+                            st.code(traceback.format_exc())
     
     # Input de usuario
     if prompt := st.chat_input("Escribe tu pregunta aquí..."):
@@ -786,9 +812,14 @@ def main():
                             "content": full_response
                         })
                     else:
-                        st.error("No se encontró información relevante.")
+                        st.error("⚠️ No se encontró información relevante en la base de datos.")
+                        st.info("💡 Intenta reformular tu pregunta o usa términos más específicos.")
                 except Exception as e:
-                    st.error(f"Error: {e}")
+                    st.error(f"❌ Error al procesar la solicitud: {str(e)}")
+                    st.warning("Posibles causas: problema con la API de Groq, límite de tasa excedido, o API key inválida.")
+                    import traceback
+                    with st.expander("🔍 Ver detalles técnicos del error"):
+                        st.code(traceback.format_exc())
 
 if __name__ == "__main__":
     main()
