@@ -475,9 +475,31 @@ def main():
     if 'messages' not in st.session_state:
         st.session_state.messages = []
     
-    # Inicializar estado de procesamiento
+    # Verificar si la base de datos tiene contenido
     if 'docs_processed' not in st.session_state:
-        st.session_state.docs_processed = True  # Ya vienen precargados
+        collection = st.session_state.rag.get_or_create_collection()
+        doc_count = collection.count()
+        
+        if doc_count > 0:
+            st.session_state.docs_processed = True
+        else:
+            # Si está vacía, intentar procesar documentos automáticamente
+            st.warning("⚠️ Base de datos vacía. Intentando cargar documentos...")
+            docs_folder = Path("./documentos")
+            
+            if docs_folder.exists() and list(docs_folder.glob("*.txt")):
+                with st.spinner("Procesando documentos por primera vez..."):
+                    num_docs = st.session_state.rag.process_documents()
+                    if num_docs > 0:
+                        st.success(f"✅ Base de datos inicializada con {num_docs} fragmentos")
+                        st.session_state.docs_processed = True
+                    else:
+                        st.error("❌ No se pudieron procesar los documentos")
+                        st.session_state.docs_processed = False
+            else:
+                st.error("❌ No se encontró la carpeta 'documentos' o está vacía")
+                st.info("💡 Asegúrate de que la carpeta 'documentos' con archivos .txt esté en el repositorio")
+                st.session_state.docs_processed = False
     
     # Inicializar flag para generar respuesta
     if 'generate_response_flag' not in st.session_state:
