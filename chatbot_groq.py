@@ -470,8 +470,22 @@ Asegúrate de:
             st.warning("⚠️ No se recibió contenido de la API.")
             return None
         
-        # Limpiar respuesta si tiene markdown
+        # Limpiar respuesta si tiene markdown o texto adicional
         respuesta_text = respuesta_text.replace("```json", "").replace("```", "").strip()
+        
+        # Buscar el JSON en la respuesta (puede tener texto antes o después)
+        import re
+        # Buscar el patrón de JSON que empieza con { y termina con }
+        json_match = re.search(r'\{[\s\S]*\}', respuesta_text)
+        
+        if json_match:
+            respuesta_text = json_match.group(0)
+        else:
+            st.error("❌ **Error:** No se encontró JSON válido en la respuesta")
+            st.warning("⚠️ La respuesta no contiene un objeto JSON reconocible")
+            with st.expander("🔍 Ver respuesta recibida"):
+                st.code(respuesta_text, language="text")
+            return None
         
         # Parsear JSON
         data = json.loads(respuesta_text)
