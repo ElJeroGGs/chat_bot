@@ -365,43 +365,48 @@ def generar_preguntas_quiz(rag_system):
     import json
     import random
     
+    # Usar diferentes queries aleatorias para obtener contextos variados
+    queries_posibles = [
+        "integración regional Europa instituciones Unión Europea",
+        "América Latina Mercosur TLCAN integración económica",
+        "tratados europeos Maastricht Roma Lisboa",
+        "teorías integración regional supranacional intergubernamental",
+        "Brexit consecuencias política europea comercio",
+        "zonas libre comercio uniones aduaneras mercado común"
+    ]
+    
+    query_seleccionada = random.choice(queries_posibles)
+    
+    # Buscar fragmentos relevantes con query aleatoria
     try:
-        # Usar diferentes queries aleatorias para obtener contextos variados
-        queries_posibles = [
-            "integración regional Europa instituciones Unión Europea",
-            "América Latina Mercosur TLCAN integración económica",
-            "tratados europeos Maastricht Roma Lisboa",
-            "teorías integración regional supranacional intergubernamental",
-            "Brexit consecuencias política europea comercio",
-            "zonas libre comercio uniones aduaneras mercado común"
-        ]
+        resultados = rag_system.search(query_seleccionada, n_results=5)
         
-        query_seleccionada = random.choice(queries_posibles)
-        
-        # Buscar fragmentos relevantes con query aleatoria
-        try:
-            resultados = rag_system.search(query_seleccionada, n_results=5)
-            
-            if not resultados or 'documents' not in resultados or not resultados['documents']:
-                raise ValueError("No se encontraron documentos en la base de datos")
-            
-            contexto = ""
-            for doc in resultados['documents'][0]:
-                contexto += doc + "\n\n"
-            
-            if not contexto.strip():
-                raise ValueError("El contexto recuperado está vacío")
-                
-        except Exception as e:
-            st.error(f"❌ **Error al buscar documentos:** {str(e)}")
+        if not resultados or 'documents' not in resultados or not resultados['documents']:
+            st.error("❌ **Error al buscar documentos:** No se encontraron documentos en la base de datos")
             st.warning("⚠️ Verifica que la base de datos ChromaDB tenga documentos cargados.")
-            raise
+            st.info("💡 **Solución:** Asegúrate de que los documentos estén procesados correctamente.")
+            return None
         
-        # Generar semilla aleatoria para mayor variabilidad
-        seed_variacion = random.randint(1, 1000)
+        contexto = ""
+        for doc in resultados['documents'][0]:
+            contexto += doc + "\n\n"
         
-        # Prompt para generar preguntas con instrucción de variabilidad
-        prompt = f"""Basándote en el siguiente contexto sobre Integración Regional en Europa y América, genera exactamente 5 preguntas de opción múltiple ÚNICAS Y DIFERENTES en formato JSON.
+        if not contexto.strip():
+            st.error("❌ **Error:** El contexto recuperado está vacío")
+            st.warning("⚠️ La base de datos no contiene información suficiente.")
+            return None
+            
+    except Exception as e:
+        st.error(f"❌ **Error al buscar documentos:** {str(e)}")
+        st.warning("⚠️ Verifica que la base de datos ChromaDB tenga documentos cargados.")
+        st.info("💡 **Solución:** Asegúrate de que los documentos estén procesados correctamente.")
+        return None
+    
+    # Generar semilla aleatoria para mayor variabilidad
+    seed_variacion = random.randint(1, 1000)
+    
+    # Prompt para generar preguntas con instrucción de variabilidad
+    prompt = f"""Basándote en el siguiente contexto sobre Integración Regional en Europa y América, genera exactamente 5 preguntas de opción múltiple ÚNICAS Y DIFERENTES en formato JSON.
 
 IMPORTANTE: Genera preguntas VARIADAS y ORIGINALES. No repitas preguntas comunes. Usa este número como inspiración para variar: {seed_variacion}
 
@@ -427,104 +432,96 @@ Asegúrate de:
 4. Explicaciones claras y útiles
 5. NO repetir las mismas preguntas típicas"""
 
-        # Llamar a Groq para generar preguntas con mayor temperatura
-        try:
-            response = rag_system.groq_client.chat.completions.create(
-                model="llama-3.1-8b-instant",
-                messages=[
-                    {"role": "user", "content": prompt}
-                ],
-                temperature=1.0,
-                max_tokens=1000
-            )
-            
-            if not response or not response.choices:
-                raise ValueError("La API de Groq no devolvió ninguna respuesta")
-                
-        except Exception as e:
-            st.error(f"❌ **Error al comunicarse con Groq API:** {str(e)}")
-            st.warning("⚠️ Posibles causas:")
-            st.markdown("""
-            - API key inválida o expirada
-            - Límite de tasa excedido (rate limit)
-            - Problemas de conexión a internet
-            - Servicio de Groq temporalmente no disponible
-            """)
-            st.info("💡 **Solución:** Espera unos segundos y vuelve a intentar. Si persiste, verifica tu API key en Streamlit Secrets.")
-            raise
+    # Llamar a Groq para generar preguntas con mayor temperatura
+    try:
+        response = rag_system.groq_client.chat.completions.create(
+            model="llama-3.1-8b-instant",
+            messages=[
+                {"role": "user", "content": prompt}
+            ],
+            temperature=1.0,
+            max_tokens=1000
+        )
         
-        # Extraer respuesta
-        try:
-            respuesta_text = response.choices[0].message.content
+        if not response or not response.choices:
+            st.error("❌ **Error:** La API de Groq no devolvió ninguna respuesta")
+            st.warning("⚠️ El servicio no respondió correctamente.")
+            st.info("💡 **Solución:** Espera unos segundos y vuelve a intentar.")
+            return None
             
-            if not respuesta_text:
-                raise ValueError("La respuesta de Groq está vacía")
-            
-            # Limpiar respuesta si tiene markdown
-            respuesta_text = respuesta_text.replace("```json", "").replace("```", "").strip()
-            
-            # Parsear JSON
-            data = json.loads(respuesta_text)
-            
-            if 'preguntas' not in data:
-                raise ValueError("El JSON no contiene el campo 'preguntas'")
-            
-            if not isinstance(data['preguntas'], list) or len(data['preguntas']) == 0:
-                raise ValueError("El campo 'preguntas' está vacío o no es una lista")
-            
-            # Validar estructura de cada pregunta
-            for i, pregunta in enumerate(data['preguntas']):
-                campos_requeridos = ['pregunta', 'opciones', 'respuesta_correcta', 'explicacion']
-                for campo in campos_requeridos:
-                    if campo not in pregunta:
-                        raise ValueError(f"La pregunta {i+1} no tiene el campo '{campo}'")
-                
-                if not isinstance(pregunta['opciones'], list) or len(pregunta['opciones']) != 4:
-                    raise ValueError(f"La pregunta {i+1} debe tener exactamente 4 opciones")
-                
-                if not isinstance(pregunta['respuesta_correcta'], int) or pregunta['respuesta_correcta'] not in [0, 1, 2, 3]:
-                    raise ValueError(f"La pregunta {i+1} tiene un índice de respuesta incorrecta inválido")
-            
-            st.success(f"✅ Se generaron {len(data['preguntas'])} preguntas exitosamente")
-            return data['preguntas']
-            
-        except json.JSONDecodeError as e:
-            st.error(f"❌ **Error al parsear JSON:** {str(e)}")
-            st.warning("⚠️ La respuesta de Groq no está en formato JSON válido")
-            st.info("🔍 **Respuesta recibida:**")
-            with st.expander("Ver respuesta de Groq"):
-                st.code(respuesta_text, language="text")
-            raise
-        except ValueError as e:
-            st.error(f"❌ **Error de validación:** {str(e)}")
-            st.warning("⚠️ Las preguntas generadas no tienen la estructura esperada")
-            raise
-        
     except Exception as e:
-        st.error(f"❌ **Error inesperado al generar preguntas:** {str(e)}")
-        st.warning("⚠️ Usando preguntas de respaldo predefinidas")
+        st.error(f"❌ **Error al comunicarse con Groq API:** {str(e)}")
+        st.warning("⚠️ **Posibles causas:**")
+        st.markdown("""
+        - 🔑 API key inválida o expirada
+        - ⏱️ Límite de tasa excedido (rate limit)
+        - 🌐 Problemas de conexión a internet
+        - 🛠️ Servicio de Groq temporalmente no disponible
+        """)
+        st.info("💡 **Solución:** Espera unos segundos y vuelve a intentar. Si persiste, verifica tu API key en Streamlit Secrets.")
+        return None
+    
+    # Extraer respuesta
+    try:
+        respuesta_text = response.choices[0].message.content
         
-        # Fallback a preguntas por defecto
-        return [
-            {
-                "pregunta": "¿En qué año se firmó el Tratado de Roma?",
-                "opciones": ["A) 1951", "B) 1957", "C) 1986", "D) 1992"],
-                "respuesta_correcta": 1,
-                "explicacion": "El Tratado de Roma de 1957 creó la Comunidad Económica Europea (CEE)."
-            },
-            {
-                "pregunta": "¿Qué significa Brexit?",
-                "opciones": ["A) British Exit", "B) Britain Exit", "C) Break Exit", "D) British Exodus"],
-                "respuesta_correcta": 0,
-                "explicacion": "Brexit es la abreviatura de 'British Exit', la salida del Reino Unido de la UE."
-            },
-            {
-                "pregunta": "¿Cuál es el órgano ejecutivo de la Unión Europea?",
-                "opciones": ["A) Parlamento Europeo", "B) Consejo Europeo", "C) Comisión Europea", "D) Tribunal de Justicia"],
-                "respuesta_correcta": 2,
-                "explicacion": "La Comisión Europea es el órgano ejecutivo que propone legislación y gestiona políticas."
-            }
-        ]
+        if not respuesta_text:
+            st.error("❌ **Error:** La respuesta de Groq está vacía")
+            st.warning("⚠️ No se recibió contenido de la API.")
+            return None
+        
+        # Limpiar respuesta si tiene markdown
+        respuesta_text = respuesta_text.replace("```json", "").replace("```", "").strip()
+        
+        # Parsear JSON
+        data = json.loads(respuesta_text)
+        
+        if 'preguntas' not in data:
+            st.error("❌ **Error de formato:** El JSON no contiene el campo 'preguntas'")
+            st.warning("⚠️ La respuesta de Groq no tiene el formato esperado")
+            with st.expander("🔍 Ver respuesta recibida"):
+                st.code(respuesta_text, language="json")
+            return None
+        
+        if not isinstance(data['preguntas'], list) or len(data['preguntas']) == 0:
+            st.error("❌ **Error:** El campo 'preguntas' está vacío o no es una lista")
+            st.warning("⚠️ No se generaron preguntas válidas")
+            return None
+        
+        # Validar estructura de cada pregunta
+        for i, pregunta in enumerate(data['preguntas']):
+            campos_requeridos = ['pregunta', 'opciones', 'respuesta_correcta', 'explicacion']
+            for campo in campos_requeridos:
+                if campo not in pregunta:
+                    st.error(f"❌ **Error de validación:** La pregunta {i+1} no tiene el campo '{campo}'")
+                    st.warning("⚠️ Las preguntas generadas no tienen la estructura completa")
+                    return None
+            
+            if not isinstance(pregunta['opciones'], list) or len(pregunta['opciones']) != 4:
+                st.error(f"❌ **Error de validación:** La pregunta {i+1} debe tener exactamente 4 opciones")
+                st.warning("⚠️ Estructura de opciones incorrecta")
+                return None
+            
+            if not isinstance(pregunta['respuesta_correcta'], int) or pregunta['respuesta_correcta'] not in [0, 1, 2, 3]:
+                st.error(f"❌ **Error de validación:** La pregunta {i+1} tiene un índice de respuesta inválido")
+                st.warning("⚠️ El índice de respuesta correcta debe ser 0, 1, 2 o 3")
+                return None
+        
+        st.success(f"✅ Se generaron {len(data['preguntas'])} preguntas exitosamente")
+        return data['preguntas']
+        
+    except json.JSONDecodeError as e:
+        st.error(f"❌ **Error al parsear JSON:** {str(e)}")
+        st.warning("⚠️ La respuesta de Groq no está en formato JSON válido")
+        with st.expander("🔍 Ver respuesta recibida"):
+            st.code(respuesta_text, language="text")
+        st.info("💡 **Solución:** Intenta generar el quiz nuevamente. Si persiste, puede ser un problema temporal de la API.")
+        return None
+    except Exception as e:
+        st.error(f"❌ **Error inesperado al procesar la respuesta:** {str(e)}")
+        st.warning("⚠️ Ocurrió un error al validar las preguntas generadas")
+        st.info("💡 **Solución:** Intenta nuevamente. Si el problema persiste, contacta al soporte.")
+        return None
 
 def mostrar_bienvenida():
     """Muestra mensaje de bienvenida"""
@@ -692,24 +689,17 @@ def main():
         
         if st.button("📝 Mini Quiz (5 preguntas)", use_container_width=True, type="secondary"):
             with st.spinner("🤔 Generando preguntas personalizadas..."):
-                try:
-                    preguntas = generar_preguntas_quiz(st.session_state.rag)
-                    
-                    if not preguntas or len(preguntas) == 0:
-                        st.error("❌ No se pudieron generar preguntas. Intenta nuevamente.")
-                    else:
-                        st.session_state.quiz_activo = True
-                        st.session_state.quiz_preguntas = preguntas
-                        st.session_state.quiz_pregunta_actual = 0
-                        st.session_state.quiz_puntuacion = 0
-                        st.session_state.quiz_respondida = False
-                        st.session_state.quiz_respuesta_correcta = False
-                        st.session_state.quiz_explicacion = ""
-                        st.rerun()
-                        
-                except Exception as e:
-                    st.error(f"❌ **Error al iniciar el quiz:** {str(e)}")
-                    st.info("💡 Por favor, intenta nuevamente en unos segundos.")
+                preguntas = generar_preguntas_quiz(st.session_state.rag)
+                
+                if preguntas and len(preguntas) > 0:
+                    st.session_state.quiz_activo = True
+                    st.session_state.quiz_preguntas = preguntas
+                    st.session_state.quiz_pregunta_actual = 0
+                    st.session_state.quiz_puntuacion = 0
+                    st.session_state.quiz_respondida = False
+                    st.session_state.quiz_respuesta_correcta = False
+                    st.session_state.quiz_explicacion = ""
+                    st.rerun()
         
         st.divider()
         st.subheader("✨ Frase del Día")
