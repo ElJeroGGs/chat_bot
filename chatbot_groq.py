@@ -198,7 +198,7 @@ Ejemplo: "tratado, maastricht" o "brexit, consecuencias" o "mercosur"
             
             try:
                 keyword_response = self.groq_client.chat.completions.create(
-                    model="lama-3.1-8b-instant",
+                    model="llama-3.1-8b-instant",
                     messages=[{"role": "user", "content": keyword_prompt}],
                     temperature=0.0,
                     max_tokens=50
@@ -379,10 +379,23 @@ def generar_preguntas_quiz(rag_system):
         query_seleccionada = random.choice(queries_posibles)
         
         # Buscar fragmentos relevantes con query aleatoria
-        resultados = rag_system.search(query_seleccionada, n_results=5)
-        contexto = ""
-        for doc in resultados['documents'][0]:
-            contexto += doc + "\n\n"
+        try:
+            resultados = rag_system.search(query_seleccionada, n_results=5)
+            
+            if not resultados or 'documents' not in resultados or not resultados['documents']:
+                raise ValueError("No se encontraron documentos en la base de datos")
+            
+            contexto = ""
+            for doc in resultados['documents'][0]:
+                contexto += doc + "\n\n"
+            
+            if not contexto.strip():
+                raise ValueError("El contexto recuperado está vacío")
+                
+        except Exception as e:
+            st.error(f"❌ **Error al buscar documentos:** {str(e)}")
+            st.warning("⚠️ Verifica que la base de datos ChromaDB tenga documentos cargados.")
+            raise
         
         # Generar semilla aleatoria para mayor variabilidad
         seed_variacion = random.randint(1, 1000)
@@ -415,34 +428,101 @@ Asegúrate de:
 5. NO repetir las mismas preguntas típicas"""
 
         # Llamar a Groq para generar preguntas con mayor temperatura
-        response = rag_system.groq_client.chat.completions.create(
-            model="llama-3.1-8b-instant",
-            messages=[
-                {"role": "user", "content": prompt}
-            ],
-            temperature=1.0,
-            max_tokens=1000
-        )
+        try:
+            response = rag_system.groq_client.chat.completions.create(
+                model="llama-3.1-8b-instant",
+                messages=[
+                    {"role": "user", "content": prompt}
+                ],
+                temperature=1.0,
+                max_tokens=1000
+            )
+            
+            if not response or not response.choices:
+                raise ValueError("La API de Groq no devolvió ninguna respuesta")
+                
+        except Exception as e:
+            st.error(f"❌ **Error al comunicarse con Groq API:** {str(e)}")
+            st.warning("⚠️ Posibles causas:")
+            st.markdown("""
+            - API key inválida o expirada
+            - Límite de tasa excedido (rate limit)
+            - Problemas de conexión a internet
+            - Servicio de Groq temporalmente no disponible
+            """)
+            st.info("💡 **Solución:** Espera unos segundos y vuelve a intentar. Si persiste, verifica tu API key en Streamlit Secrets.")
+            raise
         
         # Extraer respuesta
-        respuesta_text = response.choices[0].message.content
-        
-        # Limpiar respuesta si tiene markdown
-        respuesta_text = respuesta_text.replace("```json", "").replace("```", "").strip()
-        
-        # Parsear JSON
-        data = json.loads(respuesta_text)
-        return data['preguntas']
+        try:
+            respuesta_text = response.choices[0].message.content
+            
+            if not respuesta_text:
+                raise ValueError("La respuesta de Groq está vacía")
+            
+            # Limpiar respuesta si tiene markdown
+            respuesta_text = respuesta_text.replace("```json", "").replace("```", "").strip()
+            
+            # Parsear JSON
+            data = json.loads(respuesta_text)
+            
+            if 'preguntas' not in data:
+                raise ValueError("El JSON no contiene el campo 'preguntas'")
+            
+            if not isinstance(data['preguntas'], list) or len(data['preguntas']) == 0:
+                raise ValueError("El campo 'preguntas' está vacío o no es una lista")
+            
+            # Validar estructura de cada pregunta
+            for i, pregunta in enumerate(data['preguntas']):
+                campos_requeridos = ['pregunta', 'opciones', 'respuesta_correcta', 'explicacion']
+                for campo in campos_requeridos:
+                    if campo not in pregunta:
+                        raise ValueError(f"La pregunta {i+1} no tiene el campo '{campo}'")
+                
+                if not isinstance(pregunta['opciones'], list) or len(pregunta['opciones']) != 4:
+                    raise ValueError(f"La pregunta {i+1} debe tener exactamente 4 opciones")
+                
+                if not isinstance(pregunta['respuesta_correcta'], int) or pregunta['respuesta_correcta'] not in [0, 1, 2, 3]:
+                    raise ValueError(f"La pregunta {i+1} tiene un índice de respuesta incorrecta inválido")
+            
+            st.success(f"✅ Se generaron {len(data['preguntas'])} preguntas exitosamente")
+            return data['preguntas']
+            
+        except json.JSONDecodeError as e:
+            st.error(f"❌ **Error al parsear JSON:** {str(e)}")
+            st.warning("⚠️ La respuesta de Groq no está en formato JSON válido")
+            st.info("🔍 **Respuesta recibida:**")
+            with st.expander("Ver respuesta de Groq"):
+                st.code(respuesta_text, language="text")
+            raise
+        except ValueError as e:
+            st.error(f"❌ **Error de validación:** {str(e)}")
+            st.warning("⚠️ Las preguntas generadas no tienen la estructura esperada")
+            raise
         
     except Exception as e:
-        st.error(f"Error generando preguntas: {e}")
+        st.error(f"❌ **Error inesperado al generar preguntas:** {str(e)}")
+        st.warning("⚠️ Usando preguntas de respaldo predefinidas")
+        
         # Fallback a preguntas por defecto
         return [
             {
                 "pregunta": "¿En qué año se firmó el Tratado de Roma?",
                 "opciones": ["A) 1951", "B) 1957", "C) 1986", "D) 1992"],
                 "respuesta_correcta": 1,
-                "explicacion": "El Tratado de Roma de 1957 creó la CEE."
+                "explicacion": "El Tratado de Roma de 1957 creó la Comunidad Económica Europea (CEE)."
+            },
+            {
+                "pregunta": "¿Qué significa Brexit?",
+                "opciones": ["A) British Exit", "B) Britain Exit", "C) Break Exit", "D) British Exodus"],
+                "respuesta_correcta": 0,
+                "explicacion": "Brexit es la abreviatura de 'British Exit', la salida del Reino Unido de la UE."
+            },
+            {
+                "pregunta": "¿Cuál es el órgano ejecutivo de la Unión Europea?",
+                "opciones": ["A) Parlamento Europeo", "B) Consejo Europeo", "C) Comisión Europea", "D) Tribunal de Justicia"],
+                "respuesta_correcta": 2,
+                "explicacion": "La Comisión Europea es el órgano ejecutivo que propone legislación y gestiona políticas."
             }
         ]
 
@@ -612,11 +692,24 @@ def main():
         
         if st.button("📝 Mini Quiz (5 preguntas)", use_container_width=True, type="secondary"):
             with st.spinner("🤔 Generando preguntas personalizadas..."):
-                st.session_state.quiz_activo = True
-                st.session_state.quiz_preguntas = generar_preguntas_quiz(st.session_state.rag)
-                st.session_state.quiz_pregunta_actual = 0
-                st.session_state.quiz_puntuacion = 0
-            st.rerun()
+                try:
+                    preguntas = generar_preguntas_quiz(st.session_state.rag)
+                    
+                    if not preguntas or len(preguntas) == 0:
+                        st.error("❌ No se pudieron generar preguntas. Intenta nuevamente.")
+                    else:
+                        st.session_state.quiz_activo = True
+                        st.session_state.quiz_preguntas = preguntas
+                        st.session_state.quiz_pregunta_actual = 0
+                        st.session_state.quiz_puntuacion = 0
+                        st.session_state.quiz_respondida = False
+                        st.session_state.quiz_respuesta_correcta = False
+                        st.session_state.quiz_explicacion = ""
+                        st.rerun()
+                        
+                except Exception as e:
+                    st.error(f"❌ **Error al iniciar el quiz:** {str(e)}")
+                    st.info("💡 Por favor, intenta nuevamente en unos segundos.")
         
         st.divider()
         st.subheader("✨ Frase del Día")
@@ -638,29 +731,68 @@ def main():
     if st.session_state.quiz_activo:
         st.title("🎯 MINI QUIZ - Integración Regional")
         
+        # Validar que hay preguntas
+        if not st.session_state.quiz_preguntas or len(st.session_state.quiz_preguntas) == 0:
+            st.error("❌ No hay preguntas disponibles para el quiz")
+            if st.button("Volver al Chat", use_container_width=True):
+                st.session_state.quiz_activo = False
+                st.rerun()
+            return
+        
         if st.session_state.quiz_pregunta_actual < len(st.session_state.quiz_preguntas):
-            pregunta = st.session_state.quiz_preguntas[st.session_state.quiz_pregunta_actual]
-            num_pregunta = st.session_state.quiz_pregunta_actual + 1
-            total_preguntas = len(st.session_state.quiz_preguntas)
-            
-            col1, col2 = st.columns([3, 1])
-            with col1:
-                st.subheader(f"Pregunta {num_pregunta} de {total_preguntas}")
-            with col2:
-                st.metric("Puntuación", f"{st.session_state.quiz_puntuacion}/{total_preguntas}")
-            
-            st.divider()
-            
-            st.markdown(f"### {pregunta['pregunta']}")
-            
-            respuesta_seleccionada = st.radio(
-                "Selecciona tu respuesta:",
-                pregunta['opciones'],
-                key=f"quiz_pregunta_{st.session_state.quiz_pregunta_actual}",
-                disabled=st.session_state.quiz_respondida  # Deshabilitar si ya respondió
-            )
-            
-            idx_respuesta = pregunta['opciones'].index(respuesta_seleccionada)
+            try:
+                pregunta = st.session_state.quiz_preguntas[st.session_state.quiz_pregunta_actual]
+                
+                # Validar estructura de la pregunta
+                if not isinstance(pregunta, dict):
+                    raise ValueError("La pregunta no es un diccionario válido")
+                
+                campos_requeridos = ['pregunta', 'opciones', 'respuesta_correcta', 'explicacion']
+                for campo in campos_requeridos:
+                    if campo not in pregunta:
+                        raise ValueError(f"Falta el campo '{campo}' en la pregunta")
+                
+                if not isinstance(pregunta['opciones'], list) or len(pregunta['opciones']) != 4:
+                    raise ValueError("La pregunta debe tener exactamente 4 opciones")
+                
+                num_pregunta = st.session_state.quiz_pregunta_actual + 1
+                total_preguntas = len(st.session_state.quiz_preguntas)
+                
+                col1, col2 = st.columns([3, 1])
+                with col1:
+                    st.subheader(f"Pregunta {num_pregunta} de {total_preguntas}")
+                with col2:
+                    st.metric("Puntuación", f"{st.session_state.quiz_puntuacion}/{total_preguntas}")
+                
+                st.divider()
+                
+                st.markdown(f"### {pregunta['pregunta']}")
+                
+                respuesta_seleccionada = st.radio(
+                    "Selecciona tu respuesta:",
+                    pregunta['opciones'],
+                    key=f"quiz_pregunta_{st.session_state.quiz_pregunta_actual}",
+                    disabled=st.session_state.quiz_respondida  # Deshabilitar si ya respondió
+                )
+                
+                idx_respuesta = pregunta['opciones'].index(respuesta_seleccionada)
+                
+            except Exception as e:
+                st.error(f"❌ **Error al mostrar la pregunta:** {str(e)}")
+                st.warning("⚠️ Hay un problema con la estructura de esta pregunta")
+                
+                col1, col2 = st.columns(2)
+                with col1:
+                    if st.button("⏭️ Saltar pregunta", use_container_width=True):
+                        st.session_state.quiz_pregunta_actual += 1
+                        st.session_state.quiz_respondida = False
+                        st.rerun()
+                with col2:
+                    if st.button("🚪 Salir del Quiz", use_container_width=True):
+                        st.session_state.quiz_activo = False
+                        st.session_state.quiz_respondida = False
+                        st.rerun()
+                return
             
             col1, col2, col3 = st.columns(3)
             
