@@ -198,7 +198,7 @@ Ejemplo: "tratado, maastricht" o "brexit, consecuencias" o "mercosur"
             
             try:
                 keyword_response = self.groq_client.chat.completions.create(
-                    model="llama-3.1-70b-versatile",
+                    model="lama-3.1-8b-instant",
                     messages=[{"role": "user", "content": keyword_prompt}],
                     temperature=0.0,
                     max_tokens=50
@@ -420,8 +420,8 @@ Asegúrate de:
             messages=[
                 {"role": "user", "content": prompt}
             ],
-            temperature=1.2,
-            max_tokens=2000
+            temperature=1.0,
+            max_tokens=1000
         )
         
         # Extraer respuesta
